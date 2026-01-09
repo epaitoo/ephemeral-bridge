@@ -18,6 +18,7 @@ type application struct {
 	chiRouter *chi.Mux
 	configEnv data.ConfigEnv
 	logger    *slog.Logger
+	models    data.Models
 }
 
 func main() {
@@ -36,6 +37,31 @@ func main() {
 	flag.StringVar(&configEnv.AppEnv, "environment", configEnv.AppEnv, "Environment (development|staging|production)")
 	flag.Parse()
 
+	// Run migrations
+	logger.Info("Running database migrations...")
+	db, err := data.NewDB(configEnv.DatabaseURL)
+	if err != nil {
+		logger.Error("DB connection for migrations failed", "error", err.Error())
+		os.Exit(1)
+	}
+
+	if err := data.RunMigrations(db); err != nil {
+		logger.Error("Failed to run migrations", "error", err.Error())
+		db.Close()
+		os.Exit(1)
+	}
+	db.Close()
+	logger.Info("Database migrations completed successfully")
+
+	// load DB from Config
+	dbpool, err := data.NewPool(configEnv.DatabaseURL)
+	if err != nil {
+		logger.Error("DB Connections Error ", "error", err.Error())
+		os.Exit(1)
+	}
+
+	defer dbpool.Close()
+
 	//setup chi router
 	r := chi.NewRouter()
 
@@ -44,6 +70,7 @@ func main() {
 		configEnv: *configEnv,
 		logger:    logger,
 		chiRouter: r,
+		models:    data.NewModels(dbpool),
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
