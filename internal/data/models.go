@@ -15,10 +15,12 @@ var (
 
 type Models struct {
 	Texts TextModel
+	Files FileModel
 }
 
 func NewModels(db *pgxpool.Pool) Models {
 	return Models{
 		Texts: TextModel{DB: db},
+		Files: FileModel{DB: db},
 	}
 }

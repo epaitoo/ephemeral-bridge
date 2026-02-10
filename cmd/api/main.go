@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/epaitoo/ephermalbridge/internal/data"
 	"github.com/go-chi/chi/v5"
 )
@@ -19,6 +20,7 @@ type application struct {
 	configEnv data.ConfigEnv
 	logger    *slog.Logger
 	models    data.Models
+	r2Client  *s3.Client
 }
 
 func main() {
@@ -62,6 +64,14 @@ func main() {
 
 	defer dbpool.Close()
 
+	// Initialize R2 client
+	r2Client, err := data.NewR2Client(configEnv)
+	if err != nil {
+		logger.Error("R2 client initialization failed", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("R2 client initialized successfully")
+
 	//setup chi router
 	r := chi.NewRouter()
 
@@ -71,6 +81,7 @@ func main() {
 		logger:    logger,
 		chiRouter: r,
 		models:    data.NewModels(dbpool),
+		r2Client:  r2Client,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -20,6 +20,11 @@ func (app *application) routes() chi.Router {
 		r.Post("/v1/texts", app.createTextHandler)
 		r.Patch("/v1/texts/{id}", app.updateTextHandler)
 		r.Delete("/v1/texts/{id}", app.deleteTextHandler)
+
+		r.Post("/v1/files", app.uploadFilesHandler)
+		r.Get("/v1/files", app.getAllFilesHandler)
+		r.Get("/v1/files/{id}", app.getFileHandler)
+		r.Delete("/v1/files/{id}", app.deleteFileHandler)
 	})
 
 	return r
