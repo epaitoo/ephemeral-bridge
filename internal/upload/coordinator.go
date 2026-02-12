@@ -85,3 +85,44 @@ func (uc *UploadCoordinator) ProcessUploads(files []FileInput) {
 
 	uc.Logger.Info("all file uploads processed", slog.Int("count", len(files)))
 }
+
+func (uc *UploadCoordinator) ProcessDeleteExpiredFiles() {
+	files, err := uc.Repository.GetExpiredFiles()
+	if err != nil {
+		uc.Logger.Error("failed to get expired files",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	if len(files) == 0 {
+		return
+	}
+
+	ctx := context.Background()
+
+	uc.Logger.Info("starting expired file cleanup", slog.Int("count", len(files)))
+
+	for _, f := range files {
+		err := uc.Storage.Delete(ctx, uc.BucketName, f.ObjectKey)
+		if err != nil {
+			uc.Logger.Error("failed to delete file from storage",
+				slog.String("file_id", f.FileID.String()),
+				slog.String("filename", f.OriginalFilename),
+				slog.String("object_key", f.ObjectKey),
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+
+		if err := uc.Repository.DeleteFileFromDB(ctx, f.FileID); err != nil {
+			uc.Logger.Error("failed to delete file from DB",
+				slog.String("file_id", f.FileID.String()),
+				slog.String("object_key", f.ObjectKey),
+				slog.String("error", err.Error()),
+			)
+		}
+	}
+
+	uc.Logger.Info("expired file cleanup completed", slog.Int("count", len(files)))
+}

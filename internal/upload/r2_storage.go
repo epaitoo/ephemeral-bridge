@@ -13,7 +13,8 @@ import (
 )
 
 type R2Storage struct {
-	Client *s3.Client
+	Client        *s3.Client
+	PresignClient *s3.PresignClient
 }
 
 func (r *R2Storage) Upload(ctx context.Context, file FileInput, bucket string) (string, error) {
@@ -54,4 +55,16 @@ func (r *R2Storage) Delete(ctx context.Context, bucket, objectKey string) error 
 	}
 
 	return nil
+}
+
+func (r *R2Storage) GenerateDownloadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error) {
+	presigned, err := r.PresignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(objectKey),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+
+	return presigned.URL, nil
 }

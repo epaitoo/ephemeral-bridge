@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,22 +17,21 @@ import (
 type envelope map[string]interface{}
 
 func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
-	//Encode the data to JSON
-	js, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
+	var buf bytes.Buffer
+
+	encoder := json.NewEncoder(&buf)
+	encoder.SetIndent("", "\t")
+	encoder.SetEscapeHTML(false)
+
+	if err := encoder.Encode(data); err != nil {
 		return err
 	}
 
-	// append a new line
-	js = append(js, '\n')
-
-	for key, value := range headers {
-		w.Header()[key] = value
-	}
+	maps.Copy(w.Header(), headers)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	w.Write(js)
+	w.Write(buf.Bytes())
 
 	return nil
 }

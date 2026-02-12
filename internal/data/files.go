@@ -24,9 +24,9 @@ type File struct {
 }
 
 type FileResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Filename  *string   `json:"filename"`
-	SizeBytes int64     `json:"size_bytes"`
+	ID        uuid.UUID  `json:"id"`
+	Filename  *string    `json:"filename"`
+	SizeBytes int64      `json:"size_bytes"`
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 
@@ -104,7 +104,7 @@ func (f FileModel) GetAllFiles() (*[]File, error) {
 
 func (f FileModel) Get(id uuid.UUID) (*File, error) {
 	query := `
-		SELECT id, original_filename, size_bytes, expires_at 
+		SELECT id, bucket, object_key, original_filename, size_bytes, expires_at, downloaded_at
 		FROM files
 		WHERE id = $1`
 
@@ -115,9 +115,12 @@ func (f FileModel) Get(id uuid.UUID) (*File, error) {
 
 	err := f.DB.QueryRow(ctx, query, id).Scan(
 		&file.ID,
+		&file.Bucket,
+		&file.ObjectKey,
 		&file.OriginalFilename,
 		&file.SizeBytes,
 		&file.ExpiresAt,
+		&file.DownloadedAt,
 	)
 
 	if err != nil {
@@ -130,6 +133,27 @@ func (f FileModel) Get(id uuid.UUID) (*File, error) {
 	}
 
 	return &file, nil
+}
+
+func (f FileModel) MarkDownloaded(id uuid.UUID, expiresAt time.Time) error {
+	query := `
+		UPDATE files
+		SET downloaded_at = NOW(), expires_at = $2
+		WHERE id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := f.DB.Exec(ctx, query, id, expiresAt)
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrRecordNotFound
+	}
+
+	return nil
 }
 
 func (f FileModel) Delete(id uuid.UUID) error {
@@ -152,4 +176,50 @@ func (f FileModel) Delete(id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+// Get Expired Files to be deleted
+func (f FileModel) GetExpiredFiles() ([]File, error) {
+	query := `
+		SELECT id, bucket, object_key, original_filename, size_bytes, expires_at
+		FROM files WHERE expires_at < NOW()`
+
+	var files []File
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := f.DB.Query(ctx, query)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var file File
+
+		err := rows.Scan(
+			&file.ID,
+			&file.Bucket,
+			&file.ObjectKey,
+			&file.OriginalFilename,
+			&file.SizeBytes,
+			&file.ExpiresAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		files = append(files, file)
+	}
+
+	// Check for errors encountered during iteration.
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return files, nil
 }

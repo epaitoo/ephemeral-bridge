@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/epaitoo/ephermalbridge/internal/data"
 	"github.com/epaitoo/ephermalbridge/internal/upload"
@@ -58,15 +60,7 @@ func (app *application) uploadFilesHandler(w http.ResponseWriter, r *http.Reques
 		"count":   len(fileInputs),
 	}, nil)
 
-	// Process uploads in background goroutine
-	coordinator := &upload.UploadCoordinator{
-		Storage:    &upload.R2Storage{Client: app.r2Client},
-		Repository: &upload.PGFileRepository{Model: app.models.Files},
-		Logger:     app.logger,
-		BucketName: app.configEnv.R2BucketName,
-	}
-
-	go coordinator.ProcessUploads(fileInputs)
+	go app.coordinator.ProcessUploads(fileInputs)
 }
 
 func (app *application) getAllFilesHandler(w http.ResponseWriter, r *http.Request) {
@@ -119,4 +113,58 @@ func (app *application) deleteFileHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	app.writeJSON(w, http.StatusOK, envelope{"message": "file deleted"}, nil)
+}
+
+const presignedURLExpiry = 10 * time.Minute
+
+func (app *application) downloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		app.errorResponse(w, r, http.StatusBadRequest, "invalid file ID")
+		return
+	}
+
+	file, err := app.models.Files.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	if file.ExpiresAt != nil && file.ExpiresAt.Before(time.Now()) {
+		app.errorResponse(w, r, http.StatusGone, "file has expired")
+		return
+	}
+
+	downloadURL, err := app.storage.GenerateDownloadURL(r.Context(), file.Bucket, file.ObjectKey, presignedURLExpiry)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	if file.DownloadedAt == nil {
+		expiresAt := time.Now().Add(24 * time.Hour)
+		err = app.models.Files.MarkDownloaded(id, expiresAt)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+	}
+
+	app.writeJSON(w, http.StatusOK, envelope{
+		"download_url":       downloadURL,
+		"expires_in_seconds": int(presignedURLExpiry.Seconds()),
+	}, nil)
+}
+
+func (app *application) deleteExpiredFilesHandler(w http.ResponseWriter, r *http.Request) {
+	app.coordinator.ProcessDeleteExpiredFiles()
+
+	app.writeJSON(w, http.StatusOK, envelope{"message": "expired files cleanup completed"}, nil)
 }

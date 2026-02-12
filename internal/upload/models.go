@@ -3,6 +3,8 @@ package upload
 import (
 	"io"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type UploadResult struct {
@@ -23,6 +25,7 @@ type FileInput struct {
 }
 
 type FileMetadata struct {
+	FileID           uuid.UUID
 	Bucket           string
 	ObjectKey        string
 	OriginalFilename string

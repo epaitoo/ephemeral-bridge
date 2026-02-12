@@ -10,17 +10,20 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/epaitoo/ephermalbridge/internal/data"
+	"github.com/epaitoo/ephermalbridge/internal/upload"
 	"github.com/go-chi/chi/v5"
 )
 
 const version string = "1.0.0"
 
 type application struct {
-	chiRouter *chi.Mux
-	configEnv data.ConfigEnv
-	logger    *slog.Logger
-	models    data.Models
-	r2Client  *s3.Client
+	chiRouter   *chi.Mux
+	configEnv   data.ConfigEnv
+	logger      *slog.Logger
+	models      data.Models
+	r2Client    *s3.Client
+	storage     *upload.R2Storage
+	coordinator *upload.UploadCoordinator
 }
 
 func main() {
@@ -72,16 +75,32 @@ func main() {
 	}
 	logger.Info("R2 client initialized successfully")
 
+	storage := &upload.R2Storage{
+		Client:        r2Client,
+		PresignClient: s3.NewPresignClient(r2Client),
+	}
+
+	models := data.NewModels(dbpool)
+
+	coordinator := &upload.UploadCoordinator{
+		Storage:    storage,
+		Repository: &upload.PGFileRepository{Model: models.Files},
+		Logger:     logger,
+		BucketName: configEnv.R2BucketName,
+	}
+
 	//setup chi router
 	r := chi.NewRouter()
 
 	//app struct
 	app := application{
-		configEnv: *configEnv,
-		logger:    logger,
-		chiRouter: r,
-		models:    data.NewModels(dbpool),
-		r2Client:  r2Client,
+		configEnv:   *configEnv,
+		logger:      logger,
+		chiRouter:   r,
+		models:      models,
+		r2Client:    r2Client,
+		storage:     storage,
+		coordinator: coordinator,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

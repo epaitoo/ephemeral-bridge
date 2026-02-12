@@ -24,7 +24,9 @@ func (app *application) routes() chi.Router {
 		r.Post("/v1/files", app.uploadFilesHandler)
 		r.Get("/v1/files", app.getAllFilesHandler)
 		r.Get("/v1/files/{id}", app.getFileHandler)
+		r.Get("/v1/files/{id}/download", app.downloadFileHandler)
 		r.Delete("/v1/files/{id}", app.deleteFileHandler)
+		r.Post("/v1/files/cleanup", app.deleteExpiredFilesHandler)
 	})
 
 	return r
