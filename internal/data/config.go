@@ -18,6 +18,7 @@ type ConfigEnv struct {
 	R2BucketName      string
 	R2TokenValue      string
 	R2s3Api           string
+	CleanupIntervalMin int
 }
 
 func LoadConfig() (*ConfigEnv, error) {
@@ -78,6 +79,15 @@ func LoadConfig() (*ConfigEnv, error) {
 		return nil, fmt.Errorf("R2_S3_API is not set in .env file")
 	}
 
+	cleanupInterval := 1440 // default: 1440 minutes (24 hours)
+	if v := os.Getenv("CLEANUP_INTERVAL_MINUTES"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert CLEANUP_INTERVAL_MINUTES to int")
+		}
+		cleanupInterval = parsed
+	}
+
 	return &ConfigEnv{
 		Port:              portNum,
 		AppEnv:            appEnv,
@@ -88,6 +98,7 @@ func LoadConfig() (*ConfigEnv, error) {
 		R2BucketName:      r2BucketName,
 		R2TokenValue:      r2TokenValue,
 		R2s3Api:           r2S3Api,
+		CleanupIntervalMin: cleanupInterval,
 	}, nil
 
 }

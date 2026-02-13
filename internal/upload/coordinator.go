@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -125,4 +126,23 @@ func (uc *UploadCoordinator) ProcessDeleteExpiredFiles() {
 	}
 
 	uc.Logger.Info("expired file cleanup completed", slog.Int("count", len(files)))
+}
+
+func (uc *UploadCoordinator) StartCleanupScheduler(ctx context.Context, intervalMinutes int) {
+	interval := time.Duration(intervalMinutes) * time.Minute
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	uc.Logger.Info("cleanup scheduler started", slog.Int("interval_minutes", intervalMinutes))
+
+	for {
+		select {
+		case <-ticker.C:
+			uc.Logger.Info("running scheduled cleanup")
+			uc.ProcessDeleteExpiredFiles()
+		case <-ctx.Done():
+			uc.Logger.Info("cleanup scheduler stopped")
+			return
+		}
+	}
 }

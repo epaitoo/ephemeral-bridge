@@ -29,6 +29,9 @@ func (app *application) serve(ctx context.Context) error {
 		}
 	}()
 
+	// Start cleanup scheduler in a goroutine
+	go app.coordinator.StartCleanupScheduler(ctx, app.configEnv.CleanupIntervalMin)
+
 	// Block until context is canceled
 	<-ctx.Done()
 
