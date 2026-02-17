@@ -9,6 +9,8 @@ import (
 	"syscall"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/epaitoo/ephermalbridge/internal/auth"
+	"github.com/epaitoo/ephermalbridge/internal/config"
 	"github.com/epaitoo/ephermalbridge/internal/data"
 	"github.com/epaitoo/ephermalbridge/internal/upload"
 	"github.com/go-chi/chi/v5"
@@ -19,6 +21,8 @@ const version string = "1.0.0"
 type application struct {
 	chiRouter   *chi.Mux
 	configEnv   data.ConfigEnv
+	authConfig  *config.AuthConfig
+	cfVerifier  *auth.CloudflareVerifier
 	logger      *slog.Logger
 	models      data.Models
 	r2Client    *s3.Client
@@ -41,6 +45,21 @@ func main() {
 	flag.IntVar(&configEnv.Port, "port", configEnv.Port, "API Server Port")
 	flag.StringVar(&configEnv.AppEnv, "environment", configEnv.AppEnv, "Environment (development|staging|production)")
 	flag.Parse()
+
+	// Load auth config
+	authCfg, err := config.LoadAuthConfig()
+	if err != nil {
+		logger.Error("auth config error", "error", err.Error())
+		os.Exit(1)
+	}
+
+	var cfVerifier *auth.CloudflareVerifier
+	if !authCfg.SkipCloudflareAuth {
+		cfVerifier = auth.NewCloudflareVerifier(authCfg.CloudflareTeamDomain, authCfg.CloudflareAudience)
+		logger.Info("Cloudflare Access verification enabled")
+	} else {
+		logger.Info("Cloudflare Access verification skipped (development mode)")
+	}
 
 	// Run migrations
 	logger.Info("Running database migrations...")
@@ -95,6 +114,8 @@ func main() {
 	//app struct
 	app := application{
 		configEnv:   *configEnv,
+		authConfig:  authCfg,
+		cfVerifier:  cfVerifier,
 		logger:      logger,
 		chiRouter:   r,
 		models:      models,

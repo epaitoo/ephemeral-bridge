@@ -22,15 +22,12 @@ type ConfigEnv struct {
 }
 
 func LoadConfig() (*ConfigEnv, error) {
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		return nil, fmt.Errorf("error loading .env file: %w", err)
-	}
+	// .env file is optional; on Cloud Run, env vars are set directly
+	_ = godotenv.Load(".env")
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		return nil, fmt.Errorf("PORT is not set in .env file")
+		port = "7500"
 	}
 
 	portNum, err := strconv.Atoi(port)

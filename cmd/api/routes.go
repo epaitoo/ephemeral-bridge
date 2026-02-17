@@ -1,20 +1,33 @@
 package main
 
 import (
-	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+
+	mw "github.com/epaitoo/ephermalbridge/internal/middleware"
 )
 
 func (app *application) routes() chi.Router {
-	//setup chi router
 	r := app.chiRouter
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
 
-	// r.NotFound(app.notFoundResponse)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
+	r.Use(mw.RateLimitMiddleware(10, 20))
+
+	// Public routes
 	r.Get("/v1/healthcheck", app.healthcheckHandler)
 
+	// Auth routes: Cloudflare verification only (no API key/session needed)
 	r.Group(func(r chi.Router) {
+		r.Use(mw.CloudflareMiddleware(app.authConfig, app.cfVerifier))
+		r.Post("/v1/auth/session", app.createSessionHandler)
+		r.Post("/v1/auth/logout", app.logoutHandler)
+	})
+
+	// Protected routes: both Cloudflare + API key/session
+	r.Group(func(r chi.Router) {
+		r.Use(mw.AuthMiddleware(app.authConfig, app.cfVerifier))
+
 		r.Get("/v1/texts/{id}", app.showTextsHandler)
 		r.Get("/v1/texts", app.getAllTextsHandler)
 		r.Post("/v1/texts", app.createTextHandler)
