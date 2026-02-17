@@ -1,4 +1,4 @@
-.PHONY: help migrate-up migrate-down migrate-create migrate-force migrate-version db-up db-down
+.PHONY: help migrate-up migrate-down migrate-create migrate-force migrate-version migrate-up-prod migrate-down-prod migrate-version-prod db-up db-down
 
 # Load environment variables from .env file if it exists
 ifneq (,$(wildcard ./.env))
@@ -48,6 +48,48 @@ migrate-create: ## Create a new migration file (usage: make migrate-create name=
 		exit 1; \
 	fi
 	migrate create -ext sql -dir ./migrations -seq $(name)
+
+migrate-up-prod: ## Run all pending migrations on PRODUCTION database
+	@if [ -z "$(shell which migrate)" ]; then \
+		echo "Error: golang-migrate is not installed. Install with:"; \
+		echo "  go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest"; \
+		exit 1; \
+	fi
+	@if [ -z "$(PROD_DATABASE_URL)" ]; then \
+		echo "Error: PROD_DATABASE_URL is not set. Set it in your .env file."; \
+		exit 1; \
+	fi
+	@echo "⚠ Running migrations on PRODUCTION database..."
+	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+	@sleep 5
+	migrate -path ./migrations -database "$(PROD_DATABASE_URL)" up
+
+migrate-down-prod: ## Rollback the last migration on PRODUCTION database
+	@if [ -z "$(shell which migrate)" ]; then \
+		echo "Error: golang-migrate is not installed. Install with:"; \
+		echo "  go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest"; \
+		exit 1; \
+	fi
+	@if [ -z "$(PROD_DATABASE_URL)" ]; then \
+		echo "Error: PROD_DATABASE_URL is not set. Set it in your .env file."; \
+		exit 1; \
+	fi
+	@echo "⚠ Rolling back migration on PRODUCTION database..."
+	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+	@sleep 5
+	migrate -path ./migrations -database "$(PROD_DATABASE_URL)" down 1
+
+migrate-version-prod: ## Show current migration version on PRODUCTION database
+	@if [ -z "$(shell which migrate)" ]; then \
+		echo "Error: golang-migrate is not installed. Install with:"; \
+		echo "  go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest"; \
+		exit 1; \
+	fi
+	@if [ -z "$(PROD_DATABASE_URL)" ]; then \
+		echo "Error: PROD_DATABASE_URL is not set. Set it in your .env file."; \
+		exit 1; \
+	fi
+	migrate -path ./migrations -database "$(PROD_DATABASE_URL)" version
 
 migrate-force: ## Force set migration version (usage: make migrate-force version=1)
 	@if [ -z "$(shell which migrate)" ]; then \
