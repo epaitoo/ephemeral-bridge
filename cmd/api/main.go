@@ -61,21 +61,27 @@ func main() {
 		logger.Info("Cloudflare Access verification skipped (development mode)")
 	}
 
-	// Run migrations
-	logger.Info("Running database migrations...")
-	db, err := data.NewDB(configEnv.DatabaseURL)
-	if err != nil {
-		logger.Error("DB connection for migrations failed", "error", err.Error())
-		os.Exit(1)
-	}
+	// Run migrations (skip if migrations folder doesn't exist)
+	logger.Info("Checking for database migrations...")
+	if _, err := os.Stat("migrations"); err == nil {
 
-	if err := data.RunMigrations(db); err != nil {
-		logger.Error("Failed to run migrations", "error", err.Error())
+		db, err := data.NewDB(configEnv.DatabaseURL)
+		if err != nil {
+			logger.Error("DB connection for migrations failed", "error", err.Error())
+			os.Exit(1)
+		}
+
+		if err := data.RunMigrations(db); err != nil {
+			logger.Error("Failed to run migrations", "error", err.Error())
+			db.Close()
+			os.Exit(1)
+		}
 		db.Close()
-		os.Exit(1)
+		logger.Info("Database migrations completed successfully")
+
+	} else {
+		logger.Info("Migrations folder not found, skipping auto-migration")
 	}
-	db.Close()
-	logger.Info("Database migrations completed successfully")
 
 	// load DB from Config
 	dbpool, err := data.NewPool(configEnv.DatabaseURL)
