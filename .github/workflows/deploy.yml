@@ -1,0 +1,44 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Build binary
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o ephemeralbridge ./cmd/api
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Upload binary
+        run: |
+          scp ./ephemeralbridge ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/ephemeral-bridge/
+
+      - name: Restart app
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            pkill ephemeralbridge || true
+            cd ~/ephemeral-bridge
+            nohup ./ephemeralbridge > app.log 2>&1 &
+            sleep 2
+            pgrep ephemeralbridge && echo "App started successfully" || echo "App failed to start"
+          EOF
