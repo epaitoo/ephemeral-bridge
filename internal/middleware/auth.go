@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -47,13 +48,27 @@ func AuthMiddleware(cfg *config.AuthConfig, verifier *auth.CloudflareVerifier) f
 			if !cfg.SkipCloudflareAuth {
 				_, err := verifyCloudflare(r, cfg, verifier)
 				if err != nil {
+					slog.Info("AUTH debug: layer 1 failed",
+						"cf_client_id_present", r.Header.Get("CF-Access-Client-Id") != "",
+						"cf_client_secret_present", r.Header.Get("CF-Access-Client-Secret") != "",
+						"cf_jwt_present", r.Header.Get("CF-Access-JWT-Assertion") != "",
+						"error", err,
+					)
 					unauthorized(w)
 					return
 				}
+				slog.Info("AUTH debug: layer 1 passed")
 			}
 
 			// Layer 2: API key or session cookie
-			if !validBearerToken(r, cfg) && !validSessionCookie(r, cfg) {
+			bearer := validBearerToken(r, cfg)
+			cookie := validSessionCookie(r, cfg)
+			slog.Info("AUTH debug: layer 2",
+				"bearer_valid", bearer,
+				"cookie_valid", cookie,
+				"auth_header", r.Header.Get("Authorization"),
+			)
+			if !bearer && !cookie {
 				unauthorized(w)
 				return
 			}
