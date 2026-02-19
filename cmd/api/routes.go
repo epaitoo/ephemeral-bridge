@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 
 	mw "github.com/epaitoo/ephermalbridge/internal/middleware"
 )
@@ -13,6 +14,16 @@ func (app *application) routes() chi.Router {
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(mw.RateLimitMiddleware(10, 20))
+
+	if len(app.configEnv.CORSAllowedOrigins) > 0 {
+		r.Use(cors.Handler(cors.Options{
+			AllowedOrigins:   app.configEnv.CORSAllowedOrigins,
+			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+			AllowCredentials: true,
+			MaxAge:           300,
+		}))
+	}
 
 	// Public routes
 	r.Get("/v1/healthcheck", app.healthcheckHandler)

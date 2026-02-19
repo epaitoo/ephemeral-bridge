@@ -4,21 +4,23 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
 type ConfigEnv struct {
-	Port              int
-	AppEnv            string
-	DatabaseURL       string
-	R2AccessKeyId     string
-	R2SecretAccessKey string
-	R2AccountId       string
-	R2BucketName      string
-	R2TokenValue      string
-	R2s3Api           string
+	Port               int
+	AppEnv             string
+	DatabaseURL        string
+	R2AccessKeyId      string
+	R2SecretAccessKey  string
+	R2AccountId        string
+	R2BucketName       string
+	R2TokenValue       string
+	R2s3Api            string
 	CleanupIntervalMin int
+	CORSAllowedOrigins []string
 }
 
 func LoadConfig() (*ConfigEnv, error) {
@@ -85,17 +87,23 @@ func LoadConfig() (*ConfigEnv, error) {
 		cleanupInterval = parsed
 	}
 
+	var corsOrigins []string
+	if v := os.Getenv("CORS_ALLOWED_ORIGINS"); v != "" {
+		corsOrigins = strings.Split(v, ",")
+	}
+
 	return &ConfigEnv{
-		Port:              portNum,
-		AppEnv:            appEnv,
-		DatabaseURL:       dbUrl,
-		R2AccessKeyId:     r2AccessKeyId,
-		R2SecretAccessKey: r2SecretAccessKey,
-		R2AccountId:       r2AccountId,
-		R2BucketName:      r2BucketName,
-		R2TokenValue:      r2TokenValue,
-		R2s3Api:           r2S3Api,
+		Port:               portNum,
+		AppEnv:             appEnv,
+		DatabaseURL:        dbUrl,
+		R2AccessKeyId:      r2AccessKeyId,
+		R2SecretAccessKey:  r2SecretAccessKey,
+		R2AccountId:        r2AccountId,
+		R2BucketName:       r2BucketName,
+		R2TokenValue:       r2TokenValue,
+		R2s3Api:            r2S3Api,
 		CleanupIntervalMin: cleanupInterval,
+		CORSAllowedOrigins: corsOrigins,
 	}, nil
 
 }
