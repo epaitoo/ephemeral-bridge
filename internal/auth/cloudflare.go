@@ -115,10 +115,6 @@ func (v *CloudflareVerifier) parseAndVerify(tokenString string, keys map[string]
 		return nil, fmt.Errorf("audience mismatch")
 	}
 
-	if claims.Email == "" {
-		return nil, fmt.Errorf("missing email claim")
-	}
-
 	return claims, nil
 }
 

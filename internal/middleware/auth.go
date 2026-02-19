@@ -98,6 +98,11 @@ func verifyCloudflare(r *http.Request, cfg *config.AuthConfig, verifier *auth.Cl
 		return "", errUnauthorized
 	}
 
+	// Service token JWTs have no email claim — signature/issuer/audience already verified above
+	if claims.Email == "" {
+		return cfg.AllowedEmail, nil
+	}
+
 	if !strings.EqualFold(claims.Email, cfg.AllowedEmail) {
 		return "", errUnauthorized
 	}
