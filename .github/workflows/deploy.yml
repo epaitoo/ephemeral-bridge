@@ -29,16 +29,16 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Upload binary
+      - name: Stop app and upload binary
         run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "sudo pkill ephemeralbridge || true"
           scp ./ephemeralbridge ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/ephemeral-bridge/
 
       - name: Restart app
         run: |
           ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            pkill ephemeralbridge || true
             cd ~/ephemeral-bridge
-            nohup ./ephemeralbridge > app.log 2>&1 &
+            sudo nohup ./ephemeralbridge > app.log 2>&1 &
             sleep 2
             pgrep ephemeralbridge && echo "App started successfully" || echo "App failed to start"
           EOF
