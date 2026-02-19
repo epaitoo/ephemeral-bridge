@@ -64,6 +64,15 @@ func AuthMiddleware(cfg *config.AuthConfig, verifier *auth.CloudflareVerifier) f
 }
 
 func verifyCloudflare(r *http.Request, cfg *config.AuthConfig, verifier *auth.CloudflareVerifier) (string, error) {
+	// Check for Service Token headers (bypasses JWT verification)
+	clientID := r.Header.Get("CF-Access-Client-Id")
+	clientSecret := r.Header.Get("CF-Access-Client-Secret")
+	if clientID != "" && clientSecret != "" {
+		// Service token present - Cloudflare already validated it at the edge
+		return cfg.AllowedEmail, nil
+	}
+
+	// Regular JWT verification
 	jwtToken := r.Header.Get("CF-Access-JWT-Assertion")
 	if jwtToken == "" {
 		return "", errUnauthorized
