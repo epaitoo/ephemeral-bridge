@@ -27,7 +27,7 @@ func (app *application) createSessionHandler(w http.ResponseWriter, r *http.Requ
 		MaxAge:   app.authConfig.CookieMaxAge,
 		HttpOnly: true,
 		Secure:   !app.authConfig.SkipCloudflareAuth,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	app.writeJSON(w, http.StatusOK, envelope{"message": "session created"}, nil)
@@ -41,7 +41,7 @@ func (app *application) logoutHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   !app.authConfig.SkipCloudflareAuth,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	app.writeJSON(w, http.StatusOK, envelope{"message": "logged out"}, nil)
