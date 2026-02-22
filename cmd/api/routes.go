@@ -31,6 +31,7 @@ func (app *application) routes() chi.Router {
 	// Auth routes: Cloudflare verification only (no API key/session needed)
 	r.Group(func(r chi.Router) {
 		r.Use(mw.CloudflareMiddleware(app.authConfig, app.cfVerifier))
+		r.Get("/v1/auth/session", app.createSessionHandler)
 		r.Post("/v1/auth/session", app.createSessionHandler)
 		r.Post("/v1/auth/logout", app.logoutHandler)
 	})

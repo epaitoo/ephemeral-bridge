@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/epaitoo/ephermalbridge/internal/auth"
 	"github.com/epaitoo/ephermalbridge/internal/middleware"
@@ -29,6 +30,15 @@ func (app *application) createSessionHandler(w http.ResponseWriter, r *http.Requ
 		Secure:   !app.authConfig.SkipCloudflareAuth,
 		SameSite: http.SameSiteLaxMode,
 	})
+
+	redirectParam := r.URL.Query().Get("redirect")
+	if redirectParam != "" {
+		parsed, err := url.Parse(redirectParam)
+		if err == nil && (parsed.Host == "ephemeralbridge.cc" || parsed.Host == "www.ephemeralbridge.cc") {
+			http.Redirect(w, r, redirectParam, http.StatusFound)
+			return
+		}
+	}
 
 	app.writeJSON(w, http.StatusOK, envelope{"message": "session created"}, nil)
 }
